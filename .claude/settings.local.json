@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /c/Users/user/Documents/bug_colony/*.md)",
+      "mcp__ide__getDiagnostics"
+    ]
+  }
+}
