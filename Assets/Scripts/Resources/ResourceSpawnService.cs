@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Resources
 {
-    public class ResourceSpawnService : IDisposable
+    public class ResourceSpawnService : IResourceSpawnService, IDisposable
     {
         private readonly ObjectPool<FoodResource> _foodPool;
         private readonly IResourceRegistry _registry;

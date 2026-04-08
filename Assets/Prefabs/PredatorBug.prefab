@@ -126,6 +126,7 @@ GameObject:
   - component: {fileID: 1120401510885409824}
   - component: {fileID: -6136272649170578197}
   - component: {fileID: 2157451293547950939}
+  - component: {fileID: 949174583954038699}
   m_Layer: 0
   m_Name: PredatorBug
   m_TagString: Untagged
@@ -161,7 +162,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 025c46ab9310d994caa0423676fc6aa9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BugColony.Bugs.Predator.PredatorBug
-  _movement: {fileID: 2157451293547950939}
 --- !u!195 &-6136272649170578197
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -196,3 +196,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d0633c63fe19fc740ad3fc2bd827fe98, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BugColony.Bugs.Movement.NavMeshBugMovement
+--- !u!114 &949174583954038699
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2867963615097613696}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 631d136acf968424ebeebb7f1efcf9a3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Bugs.Core.Bug
+  _movement: {fileID: 2157451293547950939}

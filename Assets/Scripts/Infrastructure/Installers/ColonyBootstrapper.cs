@@ -1,5 +1,6 @@
 using System;
 using Colony;
+using Core;
 using Extensions;
 using Resources;
 using Zenject;
@@ -10,13 +11,13 @@ namespace Infrastructure.Installers
     {
         private readonly IBugSpawnService _spawnService;
         private readonly IColonyService _colonyService;
-        private readonly ResourceSpawnService _resourceSpawnService;
+        private readonly IResourceSpawnService _resourceSpawnService;
         private readonly ColonyConfig _colonyConfig;
 
         public ColonyBootstrapper(
             IBugSpawnService spawnService,
             IColonyService colonyService,
-            ResourceSpawnService resourceSpawnService,
+            IResourceSpawnService resourceSpawnService,
             ColonyConfig colonyConfig)
         {
             _spawnService = spawnService;
@@ -28,7 +29,7 @@ namespace Infrastructure.Installers
         public void Initialize()
         {
             _colonyService.OnColonyExtinct += HandleColonyExtinct;
-            _spawnService.SpawnWorker(_colonyConfig.SpawnCenter.SampleNavMesh());
+            _spawnService.Spawn(BugType.Worker, _colonyConfig.SpawnCenter.SampleNavMesh());
             _resourceSpawnService.StartSpawning();
         }
 
@@ -40,7 +41,7 @@ namespace Infrastructure.Installers
         private void HandleColonyExtinct()
         {
             var position = _colonyConfig.SpawnCenter.GetRandomNavMeshPoint(_colonyConfig.SpawnAreaRadius);
-            _spawnService.SpawnWorker(position);
+            _spawnService.Spawn(BugType.Worker, position);
         }
     }
 }

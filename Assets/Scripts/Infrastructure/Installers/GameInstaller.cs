@@ -1,3 +1,5 @@
+using Bugs.Core;
+using Bugs.Interaction;
 using Bugs.Predator;
 using Bugs.Worker;
 using Colony;
@@ -11,8 +13,8 @@ namespace Infrastructure.Installers
 {
     public class GameInstaller : MonoInstaller
     {
-        [SerializeField] private WorkerBug _workerPrefab;
-        [SerializeField] private PredatorBug _predatorPrefab;
+        [SerializeField] private Bug _workerBugPrefab;
+        [SerializeField] private Bug _predatorBugPrefab;
         [SerializeField] private FoodResource _foodPrefab;
         [SerializeField] private WorkerConfig _workerConfig;
         [SerializeField] private PredatorConfig _predatorConfig;
@@ -42,13 +44,15 @@ namespace Infrastructure.Installers
             Container.Bind<IResourceRegistry>().To<ResourceRegistry>().AsSingle();
             Container.Bind<IBugSpawnService>().To<BugSpawnService>().AsSingle();
             Container.Bind<IColonyService>().To<ColonyService>().AsSingle();
+            Container.Bind<IMutationService>().To<MutationService>().AsSingle();
+            Container.Bind<IInteractionService>().To<InteractionService>().AsSingle();
             Container.BindInterfacesAndSelfTo<ResourceSpawnService>().AsSingle();
         }
 
         private void BindFactories()
         {
-            Container.BindFactory<WorkerBug, WorkerBug.Factory>().FromComponentInNewPrefab(_workerPrefab);
-            Container.BindFactory<PredatorBug, PredatorBug.Factory>().FromComponentInNewPrefab(_predatorPrefab);
+            Container.BindFactory<Bug, Bug.WorkerFactory>().FromComponentInNewPrefab(_workerBugPrefab);
+            Container.BindFactory<Bug, Bug.PredatorFactory>().FromComponentInNewPrefab(_predatorBugPrefab);
             Container.BindFactory<FoodResource, FoodResource.Factory>().FromComponentInNewPrefab(_foodPrefab);
         }
 

@@ -1,4 +1,5 @@
 using System;
+using Bugs.Interaction;
 using Bugs.Movement;
 using Colony;
 using Core;
@@ -15,6 +16,7 @@ namespace Bugs.States
         private readonly IResourceRegistry _resourceRegistry;
         private readonly IBug _self;
         private readonly float _eatDistance;
+        private readonly IInteractionService _interactionService;
 
         private IEatable _currentTarget;
         private float _pathUpdateTimer;
@@ -29,7 +31,8 @@ namespace Bugs.States
             IColonyService colonyService,
             IResourceRegistry resourceRegistry,
             IBug self,
-            float eatDistance)
+            float eatDistance,
+            IInteractionService interactionService)
         {
             _movement = movement;
             _transform = transform;
@@ -37,6 +40,7 @@ namespace Bugs.States
             _resourceRegistry = resourceRegistry;
             _self = self;
             _eatDistance = eatDistance;
+            _interactionService = interactionService;
         }
 
         public void Enter()
@@ -54,21 +58,16 @@ namespace Bugs.States
             }
 
             _pathUpdateTimer += deltaTime;
-            
             if (_pathUpdateTimer >= PathUpdateInterval)
             {
                 _movement.SetDestination(_currentTarget.Position);
                 _pathUpdateTimer = 0f;
             }
 
-            var distanceSqr = (_transform.position - _currentTarget.Position).sqrMagnitude;
-            
-            if (!(distanceSqr <= _eatDistance * _eatDistance))
-            {
+            if ((_transform.position - _currentTarget.Position).sqrMagnitude > _eatDistance * _eatDistance)
                 return;
-            }
-            
-            _currentTarget.BeEaten();
+
+            _interactionService.Interact(_currentTarget);
             OnTargetEaten?.Invoke();
         }
 
@@ -81,51 +80,53 @@ namespace Bugs.States
         private void RefreshTarget()
         {
             _currentTarget = FindNearestTarget();
-            
             if (_currentTarget != null)
-            {
                 _movement.SetDestination(_currentTarget.Position);
-            }
             else
-            {
                 OnNoTargetFound?.Invoke();
-            }
         }
 
         private IEatable FindNearestTarget()
         {
+            var nearestBug = FindNearestBug();
+            var nearestResource = FindNearestResource();
+
+            if (nearestBug == null) return nearestResource;
+            if (nearestResource == null) return nearestBug;
+
+            var bugSqr = (_transform.position - nearestBug.Position).sqrMagnitude;
+            var resSqr = (_transform.position - nearestResource.Position).sqrMagnitude;
+            return bugSqr < resSqr ? nearestBug : nearestResource;
+        }
+
+        private IEatable FindNearestBug()
+        {
             IEatable nearest = null;
-            
             var nearestSqrDist = float.MaxValue;
 
             foreach (var bug in _colonyService.AliveBugs)
             {
-                if (!bug.IsAlive || ReferenceEquals(bug, _self))
+                if (!bug.IsAlive || ReferenceEquals(bug, _self) || !_interactionService.CanInteract(_self, bug))
                     continue;
-
                 var sqrDist = (_transform.position - bug.Position).sqrMagnitude;
-                
-                if (!(sqrDist < nearestSqrDist))
-                {
-                    continue;
-                }
-                
+                if (sqrDist >= nearestSqrDist) continue;
                 nearestSqrDist = sqrDist;
                 nearest = bug;
             }
 
+            return nearest;
+        }
+
+        private IEatable FindNearestResource()
+        {
+            IEatable nearest = null;
+            var nearestSqrDist = float.MaxValue;
+
             foreach (var resource in _resourceRegistry.ActiveResources)
             {
-                if (!resource.IsAlive)
-                    continue;
-
+                if (!resource.IsAlive) continue;
                 var sqrDist = (_transform.position - resource.Position).sqrMagnitude;
-                
-                if (!(sqrDist < nearestSqrDist))
-                {
-                    continue;
-                }
-                
+                if (sqrDist >= nearestSqrDist) continue;
                 nearestSqrDist = sqrDist;
                 nearest = resource;
             }

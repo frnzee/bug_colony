@@ -11,117 +11,108 @@ using Zenject;
 
 namespace Bugs.Worker
 {
-    public class WorkerBug : BugBase
+    public class WorkerBehavior : MonoBehaviour, IBugBehavior
     {
         private const float SplitSpawnOffset = 1f;
 
-        public override BugType Type => BugType.Worker;
-
-        [SerializeField] private NavMeshBugMovement _movement;
+        public BugType BugType => BugType.Worker;
 
         private WorkerConfig _config;
         private IColonyService _colonyService;
         private IBugSpawnService _spawnService;
         private IColonyStatsService _statsService;
+        private IMutationService _mutationService;
+
+        private IBugMovement _movement;
+        private StateMachine _stateMachine;
+
         private WanderState _wanderState;
         private SeekResourceState _seekResourceState;
 
+        private Bug _bug;
         private int _feedCount;
         private bool _isSplitting;
-        
+
         [Inject]
         private void Construct(
             WorkerConfig config,
             IColonyService colonyService,
             IBugSpawnService spawnService,
             IColonyStatsService statsService,
+            IMutationService mutationService,
             IResourceRegistry resourceRegistry)
         {
             _config = config;
             _colonyService = colonyService;
             _spawnService = spawnService;
             _statsService = statsService;
+            _mutationService = mutationService;
 
-            if (!_movement)
-            {
-                _movement = gameObject.AddComponent<NavMeshBugMovement>();
-            }
+            _bug = GetComponent<Bug>();
+            _movement = _bug.Movement;
+            _stateMachine = _bug.StateMachine;
 
             _movement.SetSpeed(_config.MoveSpeed);
 
-            _wanderState = new WanderState(_movement, transform, resourceRegistry, _config.WanderRadius, _config.WanderChangeInterval, _config.DetectionRadius);
+            _wanderState = new WanderState(
+                _movement, transform, resourceRegistry,
+                _config.WanderRadius, _config.WanderChangeInterval, _config.DetectionRadius);
 
-            _seekResourceState = new SeekResourceState(_movement, transform, resourceRegistry, _config.EatDistance);
+            _seekResourceState = new SeekResourceState(
+                _movement, transform, resourceRegistry, _config.EatDistance);
 
-            _wanderState.OnFoodDetected += () => StateMachine.ChangeState(_seekResourceState);
+            _wanderState.OnFoodDetected += () => _stateMachine.ChangeState(_seekResourceState);
             _seekResourceState.OnResourceEaten += HandleResourceEaten;
-            _seekResourceState.OnResourceLost += () => StateMachine.ChangeState(_wanderState);
+            _seekResourceState.OnResourceLost += () => _stateMachine.ChangeState(_wanderState);
 
-            StateMachine.ChangeState(_wanderState);
+            if (_bug.IsAlive)
+                OnSessionStart();
         }
 
-        protected override void OnEnable()
+        public void OnSessionStart()
         {
-            base.OnEnable();
-            
             _feedCount = 0;
-
             if (_wanderState != null)
-            {
-                StateMachine.ChangeState(_wanderState);
-            }
+                _stateMachine.ChangeState(_wanderState);
         }
 
-        protected override void OnKilled()
+        public void OnSessionEnd() { }
+
+        public void OnKilled()
         {
             if (!_isSplitting)
-            {
                 _statsService?.RegisterWorkerDeath();
-            }
         }
 
         private void HandleResourceEaten()
         {
             _feedCount++;
-
             if (_feedCount >= _config.FeedCountToSplit)
-            {
                 Split();
-            }
             else
-            {
-                StateMachine.ChangeState(_wanderState);
-            }
+                _stateMachine.ChangeState(_wanderState);
         }
-        
+
         private void Split()
         {
             var spawnPos = transform.position;
             var dir = Random.insideUnitSphere;
             var offsetDir = new Vector3(dir.x, 0f, dir.z).normalized * SplitSpawnOffset;
 
-            _spawnService.SpawnWorker((spawnPos + offsetDir).SampleNavMesh(SplitSpawnOffset));
+            _spawnService.Spawn(BugType.Worker, (spawnPos + offsetDir).SampleNavMesh(SplitSpawnOffset));
             SpawnSecondOffspring((spawnPos - offsetDir).SampleNavMesh(SplitSpawnOffset));
 
             _isSplitting = true;
-            Kill();
+            _bug.Kill();
             _isSplitting = false;
         }
 
         private void SpawnSecondOffspring(Vector3 pos)
         {
-            var shouldMutate = _colonyService.AliveBugCount - 1 > _config.ColonySizeForMutation && Random.value < _config.MutationChance;
-
-            if (shouldMutate)
-            {
-                _spawnService.SpawnPredator(pos);
-            }
-            else
-            {
-                _spawnService.SpawnWorker(pos);
-            }
+            var type = _mutationService.ShouldMutate(_colonyService.AliveBugCount - 1)
+                ? BugType.Predator
+                : BugType.Worker;
+            _spawnService.Spawn(type, pos);
         }
-
-        public class Factory : PlaceholderFactory<WorkerBug> { }
     }
 }

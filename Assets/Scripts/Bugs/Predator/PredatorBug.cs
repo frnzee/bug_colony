@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using Bugs.Core;
+using Bugs.Interaction;
 using Bugs.Movement;
 using Bugs.States;
 using Colony;
@@ -15,106 +16,91 @@ using Random = UnityEngine.Random;
 
 namespace Bugs.Predator
 {
-    public class PredatorBug : BugBase
+    public class PredatorBehavior : MonoBehaviour, IBugBehavior
     {
-        public override BugType Type => BugType.Predator;
+        private const float SplitSpawnOffset = 5f;
 
-        [SerializeField] private NavMeshBugMovement _movement;
+        public BugType BugType => BugType.Predator;
 
         private PredatorConfig _config;
         private IBugSpawnService _spawnService;
         private IColonyStatsService _statsService;
-        private CancellationTokenSource _lifetimeCts;
+        private IInteractionService _interactionService;
+
+        private IBugMovement _movement;
+        private StateMachine _stateMachine;
+
         private PredatorWanderState _wanderState;
         private SeekTargetState _seekTargetState;
 
+        private Bug _bug;
         private int _feedCount;
         private bool _isSplitting;
-        
+        private CancellationTokenSource _lifetimeCts;
+
         [Inject]
         private void Construct(
             PredatorConfig config,
             IColonyService colonyService,
             IBugSpawnService spawnService,
             IColonyStatsService statsService,
+            IInteractionService interactionService,
             IResourceRegistry resourceRegistry)
         {
             _config = config;
             _spawnService = spawnService;
             _statsService = statsService;
+            _interactionService = interactionService;
 
-            if (!_movement)
-            {
-                _movement = gameObject.AddComponent<NavMeshBugMovement>();
-            }
+            _bug = GetComponent<Bug>();
+            _movement = _bug.Movement;
+            _stateMachine = _bug.StateMachine;
 
             _movement.SetSpeed(_config.MoveSpeed);
 
             _wanderState = new PredatorWanderState(
-                _movement, transform, colonyService, resourceRegistry, this,
+                _movement, transform, colonyService, resourceRegistry, _bug,
                 _config.WanderRadius, _config.WanderChangeInterval, _config.DetectionRadius);
 
             _seekTargetState = new SeekTargetState(
-                _movement, transform, colonyService, resourceRegistry, this, _config.EatDistance);
+                _movement, transform, colonyService, resourceRegistry, _bug,
+                _config.EatDistance, _interactionService);
 
-            _wanderState.OnTargetDetected += () => StateMachine.ChangeState(_seekTargetState);
+            _wanderState.OnTargetDetected += () => _stateMachine.ChangeState(_seekTargetState);
             _seekTargetState.OnTargetEaten += HandleTargetEaten;
-            _seekTargetState.OnNoTargetFound += () => StateMachine.ChangeState(_wanderState);
+            _seekTargetState.OnNoTargetFound += () => _stateMachine.ChangeState(_wanderState);
 
-            StartSession();
+            if (_bug.IsAlive)
+                OnSessionStart();
         }
 
-        protected override void OnEnable()
-        {
-            base.OnEnable();
-
-            if (_wanderState != null)
-            {
-                StartSession();
-            }
-        }
-
-        protected override void OnDisable()
-        {
-            base.OnDisable();
-            
-            _lifetimeCts?.Cancel();
-        }
-
-        protected override void OnKilled()
-        {
-            _lifetimeCts?.Cancel();
-            
-            if (!_isSplitting)
-            {
-                _statsService?.RegisterPredatorDeath();
-            }
-        }
-
-        private void StartSession()
+        public void OnSessionStart()
         {
             _feedCount = 0;
             _lifetimeCts?.Cancel();
             _lifetimeCts = new CancellationTokenSource();
-            StateMachine.ChangeState(_wanderState);
+            if (_wanderState != null)
+                _stateMachine.ChangeState(_wanderState);
             StartLifetimeTimerAsync(_lifetimeCts.Token).Forget();
+        }
+
+        public void OnSessionEnd() => _lifetimeCts?.Cancel();
+
+        public void OnKilled()
+        {
+            _lifetimeCts?.Cancel();
+            if (!_isSplitting)
+                _statsService?.RegisterPredatorDeath();
         }
 
         private void HandleTargetEaten()
         {
             ++_feedCount;
-
             if (_feedCount >= _config.FeedCountToSplit)
-            {
                 Split();
-            }
             else
-            {
-                StateMachine.ChangeState(_wanderState);
-            }
+                _stateMachine.ChangeState(_wanderState);
         }
-
-        private const float SplitSpawnOffset = 5f;
 
         private void Split()
         {
@@ -122,23 +108,18 @@ namespace Bugs.Predator
             var dir = Random.insideUnitSphere;
             var offsetDir = new Vector3(dir.x, 0f, dir.z).normalized * SplitSpawnOffset;
 
-            _spawnService.SpawnPredator((spawnPos + offsetDir).SampleNavMesh(SplitSpawnOffset));
-            _spawnService.SpawnPredator((spawnPos - offsetDir).SampleNavMesh(SplitSpawnOffset));
+            _spawnService.Spawn(BugType.Predator, (spawnPos + offsetDir).SampleNavMesh(SplitSpawnOffset));
+            _spawnService.Spawn(BugType.Predator, (spawnPos - offsetDir).SampleNavMesh(SplitSpawnOffset));
 
             _isSplitting = true;
-            
-            Kill();
-            
+            _bug.Kill();
             _isSplitting = false;
         }
 
         private async UniTaskVoid StartLifetimeTimerAsync(CancellationToken token)
         {
             await UniTask.Delay(TimeSpan.FromSeconds(_config.LifetimeDuration), cancellationToken: token);
-            
-            Kill();
+            _bug.Kill();
         }
-
-        public class Factory : PlaceholderFactory<PredatorBug> { }
     }
 }

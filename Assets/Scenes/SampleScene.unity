@@ -867,8 +867,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4189e822bc755334fba0b79d1abef979, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BugColony.Infrastructure.Installers.GameInstaller
-  _workerPrefab: {fileID: 8954386206779551468, guid: 5534ed312703f864694397fcb52ff781, type: 3}
-  _predatorPrefab: {fileID: 1120401510885409824, guid: d3290bdbb3b9c5f4893396a99943fbc0, type: 3}
+  _workerBugPrefab: {fileID: -5874855120920148808, guid: 5534ed312703f864694397fcb52ff781, type: 3}
+  _predatorBugPrefab: {fileID: 949174583954038699, guid: d3290bdbb3b9c5f4893396a99943fbc0, type: 3}
   _foodPrefab: {fileID: 7271709176159572846, guid: 13b40b6c29b982a41a5c2770d147bad8, type: 3}
   _workerConfig: {fileID: 11400000, guid: 36d2acd332fbcaf4cbb81f0d1e2feeea, type: 2}
   _predatorConfig: {fileID: 11400000, guid: cd043d0f8ff20694980ac18e45e21aa9, type: 2}

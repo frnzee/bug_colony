@@ -7,5 +7,6 @@ namespace Bugs.Movement
         bool IsReachedDestination { get; }
         void SetDestination(Vector3 destination);
         void Stop();
+        void SetSpeed(float speed);
     }
 }

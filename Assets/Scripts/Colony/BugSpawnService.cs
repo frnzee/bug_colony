@@ -1,60 +1,43 @@
-using Bugs.Predator;
-using Bugs.Worker;
+using System.Collections.Generic;
+using Bugs.Core;
 using Core;
 using Infrastructure.Pool;
 using UnityEngine;
+using Zenject;
 
 namespace Colony
 {
     public class BugSpawnService : IBugSpawnService
     {
-        private readonly ObjectPool<WorkerBug> _workerPool;
-        private readonly ObjectPool<PredatorBug> _predatorPool;
+        private readonly Dictionary<BugType, ObjectPool<Bug>> _pools = new Dictionary<BugType, ObjectPool<Bug>>();
         private readonly IColonyService _colonyService;
 
-        private readonly Transform _workerContainer;
-        private readonly Transform _predatorContainer;
-
         public BugSpawnService(
-            WorkerBug.Factory workerFactory,
-            PredatorBug.Factory predatorFactory,
+            Bug.WorkerFactory workerFactory,
+            Bug.PredatorFactory predatorFactory,
             IColonyService colonyService)
         {
             _colonyService = colonyService;
-            _workerContainer = new GameObject("WorkerBugs").transform;
-            _predatorContainer = new GameObject("PredatorBugs").transform;
 
-            _workerPool = new ObjectPool<WorkerBug>(() => CreateWorker(workerFactory));
-            _predatorPool = new ObjectPool<PredatorBug>(() => CreatePredator(predatorFactory));
+            var workerContainer = new GameObject("WorkerBugs").transform;
+            var predatorContainer = new GameObject("PredatorBugs").transform;
+
+            _pools[BugType.Worker] = new ObjectPool<Bug>(() => CreateBug(workerFactory, workerContainer));
+            _pools[BugType.Predator] = new ObjectPool<Bug>(() => CreateBug(predatorFactory, predatorContainer));
         }
 
-        public IBug SpawnWorker(Vector3 position)
+        public IBug Spawn(BugType type, Vector3 position)
         {
-            var bug = _workerPool.Get(position);
+            var bug = _pools[type].Get(position);
             _colonyService.RegisterBug(bug);
             return bug;
         }
 
-        public IBug SpawnPredator(Vector3 position)
-        {
-            var bug = _predatorPool.Get(position);
-            _colonyService.RegisterBug(bug);
-            return bug;
-        }
-
-        private WorkerBug CreateWorker(WorkerBug.Factory factory)
+        private Bug CreateBug(PlaceholderFactory<Bug> factory, Transform container)
         {
             var bug = factory.Create();
-            bug.transform.SetParent(_workerContainer);
-            bug.OnDied += _ => _workerPool.Return(bug);
-            return bug;
-        }
-
-        private PredatorBug CreatePredator(PredatorBug.Factory factory)
-        {
-            var bug = factory.Create();
-            bug.transform.SetParent(_predatorContainer);
-            bug.OnDied += _ => _predatorPool.Return(bug);
+            bug.transform.SetParent(container);
+            bug.OnDied += _ => _pools[bug.Type].Return(bug);
             return bug;
         }
     }
